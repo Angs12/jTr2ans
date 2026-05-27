@@ -1,12 +1,8 @@
-import sys
 from datautils.playdata import DatasetBase as DatasetBase
-import networkx
 import os
-import networkx as nx
 from collections import defaultdict
 from tqdm import tqdm
 import pickle
-import argparse
 import re
 import readidadata
 import torch
@@ -80,23 +76,6 @@ def gen_funcstr(f, convert_jump):
                 code_lst[c] = "CONST"
     func_str = " ".join(code_lst)
     return func_str
-
-
-def load_unpair_data(
-    datapath, filt=None, alldata=True, convert_jump=True, opt=None, fp=None
-):
-    dataset = DatasetBase(datapath, filt, alldata)
-    dataset.load_unpair_data()
-    functions = []
-    for (
-        i
-    ) in (
-        dataset.get_unpaird_data()
-    ):  # proj, func_name, func_addr, asm_list, rawbytes_list, cfg, bai_featrue
-        f = (i[2], i[3], i[4], i[5], i[6])
-        func_str = gen_funcstr(f, convert_jump)
-        if len(func_str) > 0:
-            fp.write(func_str + "\n")
 
 
 def load_paired_data(
@@ -267,14 +246,4 @@ class FunctionDataset_CL_Load(torch.utils.data.Dataset):  # binary version datas
 
     def __len__(self):
         return len(self.datas)
-
-
-def load_filter_list(name):
-    import csv
-
-    f = csv.reader(open(name, "r"))
-    S = set()
-    for i in f:
-        S.add(i[1])
-    return list(S)
 

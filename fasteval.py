@@ -1,6 +1,4 @@
 import pickle
-import sys
-from datautils.playdata import DatasetBase as DatasetBase
 from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F

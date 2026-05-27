@@ -1,6 +1,3 @@
-import pickle
-import networkx
-import time
 def parse_operand(operator,location,operand1):
     operand1=operand1.strip(' ')
     operand1=operand1.replace('ptr ','')

@@ -8,7 +8,6 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from data import help_tokenize, load_paired_data,FunctionDataset_CL
-from transformers import AdamW
 import torch.nn.functional as F
 import argparse
 import wandb

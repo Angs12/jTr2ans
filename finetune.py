@@ -1,4 +1,3 @@
-from unicodedata import name
 from transformers import BertTokenizer, BertForMaskedLM, BertModel
 import torch.multiprocessing
 from torch.utils.data import DataLoader
@@ -8,14 +7,12 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from data import load_paired_data, FunctionDataset_CL, FunctionDataset_CL_Load
-from transformers import AdamW
 import torch.nn.functional as F
 import argparse
 import wandb
 import logging
 import sys
 import time
-import data
 import pickle
 WANDB = True
 
