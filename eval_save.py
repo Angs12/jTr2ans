@@ -1,21 +1,13 @@
-from transformers import BertTokenizer, BertForMaskedLM, BertModel
-from tokenizer import *
+from transformers import BertTokenizer, BertModel
 import pickle
-from torch.utils.data import DataLoader
 import os
 import torch
-import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
-from data import help_tokenize, load_paired_data,FunctionDataset_CL
-import torch.nn.functional as F
+from data import load_paired_data_fast
 import argparse
-import wandb
 import logging
 import sys
-import time
-import data
-WANDB = True
 
 def get_logger(name):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', filename=name)
@@ -26,77 +18,6 @@ def get_logger(name):
     logger.addHandler(s_handle)
     return logger
 
-def eval(model, args, valid_set, logger):
-
-    if WANDB:
-        wandb.init(project=f'jTrans-finetune')
-        wandb.config.update(args)
-    logger.info("Initializing Model...")
-    device = torch.device("cuda")
-    model.to(device)
-    logger.info("Finished Initialization...")
-    valid_dataloader = DataLoader(valid_set, batch_size=args.eval_batch_size, num_workers=24, shuffle=True)
-    global_steps = 0
-    etc=0
-    logger.info(f"Doing Evaluation ...")
-    mrr = finetune_eval(model, valid_dataloader)
-    logger.info(f"Evaluate: mrr={mrr}")
-    if WANDB:
-        wandb.log({
-                    'mrr': mrr
-                })
-
-def finetune_eval(net, data_loader):
-    net.eval()
-    print(net)
-    with torch.no_grad():
-        avg=[]
-        gt=[]
-        cons=[]
-        eval_iterator = tqdm(data_loader)
-        for i, (seq1,seq2,seq3,mask1,mask2,mask3) in enumerate(eval_iterator):
-                input_ids1, attention_mask1= seq1.cuda(),mask1.cuda()
-                input_ids2, attention_mask2= seq2.cuda(),mask2.cuda()
-                print(input_ids1.shape)
-                print(attention_mask1.shape)
-                anchor,pos=0,0
-
-                output=net(input_ids=input_ids1,attention_mask=attention_mask1)
-                #anchor=output.last_hidden_state[:,0:1,:]
-                anchor=output.pooler_output
-                output=net(input_ids=input_ids2,attention_mask=attention_mask2)
-                #pos=output.last_hidden_state[:,0:1,:]
-                pos=output.pooler_output
-                ans=0
-                for k in range(len(anchor)):    # check every vector of (vA,vB)
-                    vA=anchor[k:k+1].cpu()
-                    sim=[]
-                    for j in range(len(pos)):
-                        vB=pos[j:j+1].cpu()
-                        #vB=vB[0]
-                        AB_sim=F.cosine_similarity(vA, vB).item()
-                        sim.append(AB_sim)
-                        if j!=k:
-                            cons.append(AB_sim)
-                    sim=np.array(sim)
-                    y=np.argsort(-sim)
-                    posi=0
-                    for j in range(len(pos)):
-                        if y[j]==k:
-                            posi=j+1
-
-                    gt.append(sim[k])
-
-                    ans+=1/posi
-
-                ans=ans/len(anchor)
-                avg.append(ans)
-                print("now mrr ",np.mean(np.array(avg)))
-        fi=open("logft.txt","a")
-        print("MRR ",np.mean(np.array(avg)),file=fi)
-        print("FINAL MRR ",np.mean(np.array(avg)))
-        fi.close()
-        return np.mean(np.array(avg))
 class BinBertModel(BertModel):
     def __init__(self, config, add_pooling_layer=True):
         super().__init__(config)
@@ -131,15 +52,15 @@ if __name__ == '__main__':
     logger.info("Tokenizer Done ...")
    
     logger.info("Preparing Datasets ...")
-    ft_valid_dataset=FunctionDataset_CL(tokenizer,args.dataset_path,None,True,opt=['O0', 'O1', 'O2', 'O3', 'Os'], add_ebd=True, convert_jump_addr=True)
+    datas, ebds = load_paired_data_fast(args.dataset_path, add_ebd=True)
 
     # Phase 1: collect all function strings with lookup table
     texts, lookup = [], []
-    for i in range(len(ft_valid_dataset.datas)):
-        pairs = ft_valid_dataset.datas[i]
+    for i in range(len(datas)):
+        pairs = datas[i]
         for j in ['O0','O1','O2','O3','Os']:
-            if ft_valid_dataset.ebds[i].get(j) is not None:
-                texts.append(pairs[ft_valid_dataset.ebds[i][j]])
+            if ebds[i].get(j) is not None:
+                texts.append(pairs[ebds[i][j]])
                 lookup.append((i, j))
 
     # Phase 2: batch tokenize + infer
@@ -157,10 +78,10 @@ if __name__ == '__main__':
     # Phase 3: write back into ebds
     embs = torch.cat(embs)
     for idx, (i, j) in enumerate(lookup):
-        ft_valid_dataset.ebds[i][j] = embs[idx]
+        ebds[i][j] = embs[idx]
 
     logger.info("ebds start writing")
     fi=open(args.experiment_path,'wb')
-    pickle.dump(ft_valid_dataset.ebds,fi)
+    pickle.dump(ebds,fi)
     fi.close()
 

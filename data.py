@@ -108,6 +108,42 @@ def load_paired_data(
     return functions, func_emb_data
 
 
+def load_paired_data_fast(
+    datapath, convert_jump=True,
+    opt=('O0', 'O1', 'O2', 'O3', 'Os'), add_ebd=False
+):
+    """Same output as load_paired_data, reads saved_index.pkl directly instead of
+    loading every individual _extract.pkl file."""
+    functions, func_emb_data, SUM = [], [], 0
+    for proj_dir in sorted(os.listdir(datapath)):
+        proj_path = os.path.join(datapath, proj_dir)
+        if not os.path.isdir(proj_path):
+            continue
+        extract = [f for f in os.listdir(proj_path) if f.endswith('_extract.pkl')]
+        if len(extract) < 2:
+            continue
+        idx2opt = {i: f.split('-')[-2] for i, f in enumerate(sorted(extract))}
+        saved_path = os.path.join(proj_path, 'saved_index.pkl')
+        if not os.path.exists(saved_path):
+            continue
+        saved = pickle.load(open(saved_path, 'rb'))
+        for func_name, func_data_list in saved.items():
+            functions.append([])
+            if add_ebd:
+                func_emb_data.append({"proj": proj_dir, "funcname": func_name})
+            for idx, func_data in enumerate(func_data_list):
+                o = idx2opt.get(idx)
+                if o in opt:
+                    func_str = gen_funcstr(func_data, convert_jump)
+                    if func_str:
+                        if add_ebd:
+                            func_emb_data[-1][o] = len(functions[-1])
+                        functions[-1].append(func_str)
+                        SUM += 1
+    print("TOTAL", SUM)
+    return functions, func_emb_data
+
+
 class FunctionDataset_CL(torch.utils.data.Dataset):  # binary version dataset
     def __init__(
         self,
