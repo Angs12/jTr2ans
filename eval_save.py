@@ -109,6 +109,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_path", type=str, default='./BinaryCorp/small_test', help="Path to the dataset")
     parser.add_argument("--experiment_path", type=str, default='./experiments/BinaryCorp-3M/jTrans.pkl', help="Path to the experiment")
     parser.add_argument("--tokenizer", type=str, default='./jtrans_tokenizer/')
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size for embedding generation")
 
     args = parser.parse_args()
 
@@ -131,18 +132,32 @@ if __name__ == '__main__':
    
     logger.info("Preparing Datasets ...")
     ft_valid_dataset=FunctionDataset_CL(tokenizer,args.dataset_path,None,True,opt=['O0', 'O1', 'O2', 'O3', 'Os'], add_ebd=True, convert_jump_addr=True)
-    for i in tqdm(range(len(ft_valid_dataset.datas))):
-        pairs=ft_valid_dataset.datas[i]
+
+    # Phase 1: collect all function strings with lookup table
+    texts, lookup = [], []
+    for i in range(len(ft_valid_dataset.datas)):
+        pairs = ft_valid_dataset.datas[i]
         for j in ['O0','O1','O2','O3','Os']:
             if ft_valid_dataset.ebds[i].get(j) is not None:
-                idx=ft_valid_dataset.ebds[i][j]
-                ret1=tokenizer([pairs[idx]], add_special_tokens=True,max_length=512,padding='max_length',truncation=True,return_tensors='pt') #tokenize them
-                seq1=ret1['input_ids']
-                mask1=ret1['attention_mask']
-                input_ids1, attention_mask1= seq1.cuda(),mask1.cuda()
-                output=model(input_ids=input_ids1,attention_mask=attention_mask1)
-                anchor=output.pooler_output
-                ft_valid_dataset.ebds[i][j]=anchor.detach().cpu()
+                texts.append(pairs[ft_valid_dataset.ebds[i][j]])
+                lookup.append((i, j))
+
+    # Phase 2: batch tokenize + infer
+    logger.info(f"Generating embeddings for {len(texts)} functions, batch_size={args.batch_size} ...")
+    embs = []
+    with torch.no_grad():
+        for start in tqdm(range(0, len(texts), args.batch_size)):
+            batch = texts[start:start + args.batch_size]
+            ret = tokenizer(batch, add_special_tokens=True, max_length=512,
+                            padding='max_length', truncation=True, return_tensors='pt')
+            out = model(input_ids=ret['input_ids'].cuda(),
+                        attention_mask=ret['attention_mask'].cuda())
+            embs.append(out.pooler_output.detach().cpu())
+
+    # Phase 3: write back into ebds
+    embs = torch.cat(embs)
+    for idx, (i, j) in enumerate(lookup):
+        ft_valid_dataset.ebds[i][j] = embs[idx]
 
     logger.info("ebds start writing")
     fi=open(args.experiment_path,'wb')
