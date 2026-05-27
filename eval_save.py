@@ -102,8 +102,6 @@ class BinBertModel(BertModel):
         super().__init__(config)
         self.config = config
         self.embeddings.position_embeddings=self.embeddings.word_embeddings
-from datautils.playdata import DatasetBase as DatasetBase
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="jTrans-EvalSave")
@@ -118,7 +116,8 @@ if __name__ == '__main__':
     now = datetime.now() # current date and time
     TIMESTAMP="%Y%m%d%H%M"
     tim = now.strftime(TIMESTAMP)
-    logger = get_logger(f"jTrans-{args.model_path}-eval-{args.dataset_path}_savename_{args.experiment_path}_{tim}")
+    safe_name = f"jTrans-eval-{os.path.basename(args.dataset_path)}_{tim}"
+    logger = get_logger(safe_name)
     logger.info(f"Loading Pretrained Model from {args.model_path} ...")
     model = BinBertModel.from_pretrained(args.model_path)
 
