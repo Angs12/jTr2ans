@@ -4,7 +4,6 @@ from tqdm import tqdm
 from shutil import move
 import pickle
 from functools import reduce
-import networkx as nx
 
 def pairdata(data_dir):
     def get_prefix(path): # get proj name

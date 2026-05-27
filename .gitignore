@@ -1,2 +1,8 @@
 models/
 experiments/
+*.tar.gz
+__pycache__/
+small_test/
+small_train/
+BinaryCorp-Binaries/
+csvList/

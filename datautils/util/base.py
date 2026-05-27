@@ -1,5 +1,4 @@
 from elftools.elf.elffile import ELFFile
-import elftools.elf.elffile as elffile
 from elftools.elf.sections import SymbolTableSection
 from collections import defaultdict
 import os
