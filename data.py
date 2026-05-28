@@ -1,13 +1,12 @@
 from datautils.playdata import DatasetBase as DatasetBase
 import os
 from collections import defaultdict
-from tqdm import tqdm
 import pickle
-import re
 import readidadata
 import torch
 import random
 import time
+from multiprocessing import Pool
 
 MAXLEN = 512
 
@@ -115,6 +114,7 @@ def load_paired_data_fast(
     """Same output as load_paired_data, reads saved_index.pkl directly instead of
     loading every individual _extract.pkl file."""
     functions, func_emb_data, SUM = [], [], 0
+    tasks, task_meta = [], []
     for proj_dir in sorted(os.listdir(datapath)):
         proj_path = os.path.join(datapath, proj_dir)
         if not os.path.isdir(proj_path):
@@ -128,18 +128,24 @@ def load_paired_data_fast(
             continue
         saved = pickle.load(open(saved_path, 'rb'))
         for func_name, func_data_list in saved.items():
+            func_idx = len(functions)
             functions.append([])
             if add_ebd:
                 func_emb_data.append({"proj": proj_dir, "funcname": func_name})
             for idx, func_data in enumerate(func_data_list):
                 o = idx2opt.get(idx)
                 if o in opt:
-                    func_str = gen_funcstr(func_data, convert_jump)
-                    if func_str:
-                        if add_ebd:
-                            func_emb_data[-1][o] = len(functions[-1])
-                        functions[-1].append(func_str)
-                        SUM += 1
+                    tasks.append((func_data, convert_jump))
+                    task_meta.append((func_idx, o))
+    with Pool() as pool:
+        results = pool.starmap(gen_funcstr, tasks)
+    del tasks
+    for (func_idx, o), func_str in zip(task_meta, results):
+        if func_str:
+            if add_ebd:
+                func_emb_data[func_idx][o] = len(functions[func_idx])
+            functions[func_idx].append(func_str)
+            SUM += 1
     print("TOTAL", SUM)
     return functions, func_emb_data
 

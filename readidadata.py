@@ -1,32 +1,11 @@
 def parse_operand(operator,location,operand1):
     operand1=operand1.strip(' ')
-    operand1=operand1.replace('ptr ','')
-    operand1=operand1.replace('offset ','')
-    operand1=operand1.replace('xmmword ','')
-    operand1=operand1.replace('dword ','')
-    operand1=operand1.replace('qword ','')
-    operand1=operand1.replace('word ','')
-    operand1=operand1.replace('byte ','')
-    operand1=operand1.replace('short ','')
-    operand1=operand1.replace('-','+')
+    for p in ('ptr ','offset ','xmmword ','dword ','qword ','word ','byte ','short '):
+        operand1 = operand1.replace(p, '')
+    operand1 = operand1.replace('-','+')
 
-    if operand1[0:3]=='cs:' :
-        operand1='cs:xxx'
-        return operand1
-    if operand1[0:3]=='ss:' :
-        operand1='ss:xxx'
-        return operand1
-    if operand1[0:3]=='fs:' :
-        operand1='fs:xxx'
-        return operand1
-    if operand1[0:3]=='ds:' :
-        operand1='ds:xxx'
-        return operand1
-    if operand1[0:3]=='es:' :
-        operand1='es:xxx'
-        return operand1
-    if operand1[0:3]=='gs:' :
-        operand1='gs:xxx'
+    if operand1[:3] in {'cs:','ss:','fs:','ds:','es:','gs:'}:
+        operand1 = operand1[:3] + 'xxx'
         return operand1
     if operator[0]=='j' and not isregister(operand1):
         if operand1[0:4]=='loc_' or operand1[0:7]=='locret_' or operand1[0:4]=='sub_' :
@@ -105,54 +84,34 @@ def parse_operand(operator,location,operand1):
         operand1='CONST'
         return operand1
     return operand1
-def parse_asm(code):   #handle ida code to better quality code for NLP model
-    annotation=None
-    operator,operand=None,None
-    operand1,operand2,operand3=None,None,None
-    if code.find(';')!=-1:
-        id=code.find(';')
-        annotation=code[id+1:]
-        code=code[0:id]
-    if code.find(' ')!=-1:
-        id=code.find(' ')
-        operand=code[id+1:]
-        operator=code[0:id]
-    else:
-        operator=code
-    if operand!=None:
-        if operand.find(',')!=-1:
-            strs=operand.split(',')
-            if len(strs)==2:
-                operand1,operand2=strs[0],strs[1]
-            else:
-                operand1,operand2,operand3=strs[0],strs[1],strs[2]
-        else:
-            operand1=operand
-            operand2=None
-    if operand1!=None:
-        operand1=parse_operand(operator,1,operand1)
-    if operand2!=None:
-        operand2=parse_operand(operator,2,operand2)
-    if operand3!=None:
-        operand3=parse_operand(operator,3,operand3)
-    return operator,operand1,operand2,operand3,annotation
+def parse_asm(code):
+    annotation = None
+    operator, operand = None, None
+    operand1, operand2, operand3 = None, None, None
+    code, _, annotation = code.partition(';')
+    annotation = annotation or None
+    parts = code.split(' ', maxsplit=1)
+    operator = parts[0]
+    operand = parts[1] if len(parts) > 1 else None
+    if operand is not None:
+        operand1, *rest = operand.split(',')
+        operand2 = rest[0] if rest else None
+        operand3 = rest[1] if len(rest) > 1 else None
+    if operand1 is not None:
+        operand1 = parse_operand(operator, 1, operand1)
+    if operand2 is not None:
+        operand2 = parse_operand(operator, 2, operand2)
+    if operand3 is not None:
+        operand3 = parse_operand(operator, 3, operand3)
+    return operator, operand1, operand2, operand3, annotation
 def isregister(x):
-    registers=['rax','rbx','rcx','rdx','esi','edi','rbp','rsp','r8','r9','r10','r11','r12','r13','r14','r15']
-    return x in registers
+    return x in {'rax','rbx','rcx','rdx','esi','edi','rbp','rsp','r8','r9','r10','r11','r12','r13','r14','r15'}
 def ispurenumber(number):
     if len(number)==1 and str.isdigit(number):
         return True
     return False
 def isaddr(number):
-    return number[0]=='[' and number[-1]==']'
+    return number.startswith('[') and number.endswith(']')
 def ishexnumber(number):
-    if number[-1]=='h':
-        for i in range(len(number)-1):
-            if str.isdigit(number[i]) or (number[i] >='A' and number[i]<='F'):
-                continue
-            else:
-                return False
-    else:
-        return False
-    return True
+    return number[-1] == 'h' and all(str.isdigit(c) or 'A' <= c <= 'F' for c in number[:-1])
 
