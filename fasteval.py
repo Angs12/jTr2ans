@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import argparse
 
-def eval_O(ebds,TYPE1,TYPE2):
+def eval_O(ebds,TYPE1,TYPE2,limit=None):
     funcarr1=[]
     funcarr2=[]
 
@@ -24,10 +24,14 @@ def eval_O(ebds,TYPE1,TYPE2):
     SIMS=[]
     Recall_AT_1=[]
 
+    pool_count = 0
     for idx, (anchor,pos) in enumerate(tqdm(dataloader)):
         anchor = anchor.cuda()
         pos =pos.cuda()
+        if limit is not None and pool_count >= limit:
+            break
         if anchor.shape[0]==POOLSIZE:
+            pool_count += 1
             for i in range(len(anchor)):    # check every vector of (vA,vB)
                 vA=anchor[i:i+1]  #pos[i]
                 sim = np.array(torch.mm(vA, pos.T).cpu().squeeze())
@@ -60,6 +64,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="jTrans-FastEval")
     parser.add_argument("--experiment_path", type=str, default='./experiments/BinaryCorp-3M/jTrans.pkl', help="experiment to be evaluated")
     parser.add_argument("--poolsize", type=int, default=32, help="size of the function pool")
+    parser.add_argument("--limit", type=int, default=None, help="Max pools to evaluate")
     args = parser.parse_args()
 
     POOLSIZE=args.poolsize
@@ -69,9 +74,9 @@ if __name__ == '__main__':
 
     print(f'evaluating...poolsize={POOLSIZE}')
 
-    eval_O(ebds,'O0','O3')
-    eval_O(ebds,'O0','Os')
-    eval_O(ebds,'O1','Os')
-    eval_O(ebds,'O1','O3')
-    eval_O(ebds,'O2','Os')
-    eval_O(ebds,'O2','O3')
+    eval_O(ebds,'O0','O3',limit=args.limit)
+    eval_O(ebds,'O0','Os',limit=args.limit)
+    eval_O(ebds,'O1','Os',limit=args.limit)
+    eval_O(ebds,'O1','O3',limit=args.limit)
+    eval_O(ebds,'O2','Os',limit=args.limit)
+    eval_O(ebds,'O2','O3',limit=args.limit)

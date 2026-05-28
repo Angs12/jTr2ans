@@ -31,6 +31,7 @@ if __name__ == '__main__':
     parser.add_argument("--experiment_path", type=str, default='./experiments/BinaryCorp-3M/jTrans.pkl', help="Path to the experiment")
     parser.add_argument("--tokenizer", type=str, default='./jtrans_tokenizer/')
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size for embedding generation")
+    parser.add_argument("--limit", type=int, default=None, help="Max projects to process")
 
     args = parser.parse_args()
 
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     logger.info("Tokenizer Done ...")
    
     logger.info("Preparing Datasets ...")
-    datas, ebds = load_paired_data_fast(args.dataset_path, add_ebd=True)
+    datas, ebds = load_paired_data_fast(args.dataset_path, add_ebd=True, limit=args.limit)
 
     # Phase 1: collect all function strings with lookup table
     texts, lookup = [], []
